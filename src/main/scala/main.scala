@@ -9,11 +9,11 @@ import scala.collection.mutable
 case class Reading(val sensorId: String, val timeStamp: Long, val value: Double):
 
   override def toString(): String =
-    s"Logged at $timeStamp, Reading: $value"
+    s"Sensor $sensorId: Logged at $timeStamp, Reading: $value"
 
 case class OperatingRange(val min: Double, val max: Double):
   override def toString(): String =
-    s"Min: $min, Max: $max"
+    s"[$min, $max]"
 
 case class Sensor(val id: String, val location: String, val validRange: OperatingRange):
   override def toString(): String =
@@ -21,12 +21,12 @@ case class Sensor(val id: String, val location: String, val validRange: Operatin
 
 case class Alert(val reading: Reading, val reason: String):
   override def toString(): String =
-    s"This is working"
+    s"${reading.value} $reason"
 
 
 class SensorNetworkManager:
   var sensorMap = mutable.Map[String, Sensor]()
-  var sensorLog = mutable.Map[String, mutable.ArrayBuffer[String]]()
+  var sensorLog = mutable.Map[String, mutable.ArrayBuffer[Reading]]()
 
   def sensorCount(): Int =
     sensorMap.size
@@ -46,10 +46,21 @@ class SensorNetworkManager:
     if !sensorMap.contains(reading.sensorId)
       then return false
     else
-      sensorLog(reading.sensorId) += reading.toString()
+      sensorLog(reading.sensorId) += reading
     true
 
-  def viewSensorLog(id: String): Unit =
+  def alertsFor(id: String): Array[Alert] =
+    val sensor = sensorMap(id)
+    val alertsFromLogs = sensorLog(id).filter(reading =>
+        reading.value < sensor.validRange.min || reading.value > sensor.validRange.max).toArray
+    alertsFromLogs.map(reading =>
+        Alert(reading, s"Value ${reading.value} out of range ${sensor.validRange}"))
+
+
+  def logsFor(id: String): Option[Array[String]] =
     sensorLog.get(id) match
-      case Some(log) => log.foreach(println(_))
-      case None => println(s"Sensor with ID $id does not exist in logging system.")
+      case Some(log) => 
+        val strings = log.map(reading => reading.toString()).toArray
+        Some(strings)
+      case None => None
+
