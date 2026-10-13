@@ -67,10 +67,10 @@ class SensorNetworkManager:
       case None => None
       
 
-  def logsFor(id: String): Option[Array[String]] =
+  def groupedBySensor(id: String): Option[Vector[Reading]] =
     sensorLog.get(id) match
       case Some(log) => 
-        val strings = log.map(reading => reading.toString()).toArray
-        Some(strings)
+        val readings = log.toVector
+        Some(readings)
       case None => None
 

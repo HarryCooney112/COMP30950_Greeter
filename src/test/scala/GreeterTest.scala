@@ -31,15 +31,15 @@ class GreeterSuite extends AnyFunSuite {
     val reading = Reading(s1.id, 3, 10)
     network.addReading(reading)
 
-    val logs = network.logsFor("1235")
+    val logs = network.groupedBySensor("1235")
     logs match
-      case Some(l) => assert(l(0) == "Sensor 1235: Logged at 3, Reading: 10.0")
+      case Some(l) => assert(l(0).toString() == "Sensor 1235: Logged at 3, Reading: 10.0")
       case None => false
   }
 
-  test("forLogs returns None if sensor is not in system") {
+  test("groupedBySensor returns None if sensor is not in system") {
     var network = SensorNetworkManager()
-    val logs = network.logsFor("1235")
+    val logs = network.groupedBySensor("1235")
     assert(logs == None)
   }
 
