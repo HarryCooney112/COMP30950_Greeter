@@ -62,4 +62,33 @@ class GreeterSuite extends AnyFunSuite {
     assert(alerts(1).reason == "Value -1.0 out of range [1.0, 5.0]" && alerts(1).reading == readings(3))
     assert(alerts(2).reason == "Value 7.0 out of range [1.0, 5.0]" && alerts(2).reading == readings(4))
   }
+
+  test("averageFor returns correct value") {
+    var network = SensorNetworkManager()
+    val s1 = Sensor("123", "Dublin", OperatingRange(1, 5))
+    network.registerSensor(s1)
+
+    val readings = Array(
+      Reading(s1.id, 3, 3),
+      Reading(s1.id, 3, 2),
+      Reading(s1.id, 3, 1),
+    )
+    readings.foreach(network.addReading(_))
+    val average = network.averageFor("123")
+    assert(average == Some(2.0))
+  }
+
+  test("AverageFor returns None for unregistered sensor") {
+    val network = SensorNetworkManager()
+    val average = network.averageFor("1")
+    assert(average == None)
+  }
+
+  test("AverageFor returns None for sensor with 0 readings") {
+    val network = SensorNetworkManager()
+    val sensor = Sensor("1", "Dublin", OperatingRange(1, 5))
+    network.registerSensor(sensor)
+    val average = network.averageFor("1")
+    assert(average == None)
+  }
 }

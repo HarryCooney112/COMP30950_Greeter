@@ -56,6 +56,16 @@ class SensorNetworkManager:
     alertsFromLogs.map(reading =>
         Alert(reading, s"Value ${reading.value} out of range ${sensor.validRange}"))
 
+  def averageFor(id: String): Option[Double] =
+    sensorLog get id match
+      case Some(logs) =>
+        val logsLength = logs.length.toDouble
+        if logsLength == 0 then return None
+
+        val readingValueSum = logs.map( reading => reading.value ).reduce((a, b) => (a + b))
+        Some(readingValueSum / logsLength)
+      case None => None
+      
 
   def logsFor(id: String): Option[Array[String]] =
     sensorLog.get(id) match
