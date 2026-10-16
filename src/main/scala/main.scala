@@ -6,30 +6,15 @@ import scala.collection.mutable
   println(myGreeter.hi)
   println(myGreeter.bye)
 
-case class Reading(val sensorId: String, val timeStamp: Long, val value: Double):
-
-  override def toString(): String =
-    s"Sensor $sensorId: Logged at $timeStamp, Reading: $value"
-
-case class OperatingRange(val min: Double, val max: Double):
-  override def toString(): String =
-    s"[$min, $max]"
-
-case class Sensor(val id: String, val location: String, val validRange: OperatingRange):
-  override def toString(): String =
-    s"Id: $id, Location: $location"
-
-case class Alert(val reading: Reading, val reason: String):
-  override def toString(): String =
-    s"${reading.value} $reason"
-
-
 class SensorNetworkManager:
-  var sensorMap = mutable.Map[String, Sensor]()
-  var sensorLog = mutable.Map[String, mutable.ArrayBuffer[Reading]]()
+  private var _sensorMap = mutable.Map[String, Sensor]()
+  private var _sensorLog = mutable.ArrayBuffer[Reading]()
+
+  def sensorMap = _sensorMap
+  def sensorLog = _sensorLog
 
   def sensorCount(): Int =
-    sensorMap.size
+    Analytics.sensorCount(sensorMap)
 
   def clear(): Unit =
     sensorMap.clear()
@@ -40,37 +25,24 @@ class SensorNetworkManager:
       then println(s"Sensor with ID ${sensor.id} already exists.")
     else
       sensorMap(sensor.id) = sensor
-      sensorLog(sensor.id) = mutable.ArrayBuffer()
 
   def addReading(reading: Reading): Boolean =
-    if !sensorMap.contains(reading.sensorId)
-      then return false
-    else
-      sensorLog(reading.sensorId) += reading
-    true
+    Analytics.addReading(reading, sensorMap, sensorLog)
 
-  def alertsFor(id: String): Array[Alert] =
-    val sensor = sensorMap(id)
-    val alertsFromLogs = sensorLog(id).filter(reading =>
-        reading.value < sensor.validRange.min || reading.value > sensor.validRange.max).toArray
-    alertsFromLogs.map(reading =>
-        Alert(reading, s"Value ${reading.value} out of range ${sensor.validRange}"))
+  def alertsFor(id: String): Option[Vector[Alert]] =
+    Analytics.alertsFor(id, sensorLog, sensorMap)
 
   def averageFor(id: String): Option[Double] =
-    sensorLog get id match
-      case Some(logs) =>
-        val logsLength = logs.length.toDouble
-        if logsLength == 0 then return None
+    Analytics.averageFor(id, sensorLog)
 
-        val readingValueSum = logs.map( reading => reading.value ).reduce((a, b) => (a + b))
-        Some(readingValueSum / logsLength)
-      case None => None
-      
+  def minMax(id: String): Option[(Double, Double)] =
+    Analytics.minMax(id, sensorLog, sensorMap)
 
-  def groupedBySensor(id: String): Option[Vector[Reading]] =
-    sensorLog.get(id) match
-      case Some(log) => 
-        val readings = log.toVector
-        Some(readings)
-      case None => None
+  def logsFor(id: String): Option[Vector[Reading]] =
+    Analytics.logsFor(id, sensorLog)
 
+  def groupedBySensor(): Map[String, Vector[Reading]] =
+    Analytics.groupedBySensor(sensorLog)
+
+  def minuteAverages(sensorId: String): Map[Long, Double] =
+    Analytics.minuteAverages(sensorId, sensorLog)

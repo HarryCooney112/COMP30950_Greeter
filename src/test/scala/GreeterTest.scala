@@ -1,5 +1,5 @@
-
 import org.scalatest.funsuite.AnyFunSuite
+import scala.math.BigDecimal
 
 class GreeterSuite extends AnyFunSuite {
 
@@ -31,15 +31,15 @@ class GreeterSuite extends AnyFunSuite {
     val reading = Reading(s1.id, 3, 10)
     network.addReading(reading)
 
-    val logs = network.groupedBySensor("1235")
+    val logs = network.logsFor("1235")
     logs match
       case Some(l) => assert(l(0).toString() == "Sensor 1235: Logged at 3, Reading: 10.0")
       case None => false
   }
 
-  test("groupedBySensor returns None if sensor is not in system") {
+  test("logsFor returns None if sensor is not in system") {
     var network = SensorNetworkManager()
-    val logs = network.groupedBySensor("1235")
+    val logs = network.logsFor("1235")
     assert(logs == None)
   }
 
@@ -57,10 +57,12 @@ class GreeterSuite extends AnyFunSuite {
     )
 
     readings.foreach(network.addReading(_))
-    val alerts = network.alertsFor("123")
-    assert(alerts(0).reason == "Value 10.0 out of range [1.0, 5.0]" && alerts(0).reading == readings(0))
-    assert(alerts(1).reason == "Value -1.0 out of range [1.0, 5.0]" && alerts(1).reading == readings(3))
-    assert(alerts(2).reason == "Value 7.0 out of range [1.0, 5.0]" && alerts(2).reading == readings(4))
+    network.alertsFor("123") match
+      case Some(alerts) =>
+        assert(alerts(0).reason == "Value 10.0 out of range [1.0, 5.0]" && alerts(0).reading == readings(0))
+        assert(alerts(1).reason == "Value -1.0 out of range [1.0, 5.0]" && alerts(1).reading == readings(3))
+        assert(alerts(2).reason == "Value 7.0 out of range [1.0, 5.0]" && alerts(2).reading == readings(4))
+      case None => false
   }
 
   test("averageFor returns correct value") {
@@ -90,5 +92,96 @@ class GreeterSuite extends AnyFunSuite {
     network.registerSensor(sensor)
     val average = network.averageFor("1")
     assert(average == None)
+  }
+
+  test("minMax works for registered sensor with reading") {
+    var network = SensorNetworkManager()
+      val s1 = Sensor("123", "Dublin", OperatingRange(1, 5))
+      network.registerSensor(s1)
+
+      val readings = Array(
+        Reading(s1.id, 3, 3),
+        Reading(s1.id, 3, 2),
+        Reading(s1.id, 3, 1),
+      )
+      readings.foreach(network.addReading(_))
+      val range = network.minMax("123")
+      assert(range == Some((1.0, 3.0)))
+  }
+
+  test("minMax works for registered sensor with reading and extreme values") {
+    var network = SensorNetworkManager()
+    val s1 = Sensor("123", "Dublin", OperatingRange(1, 5))
+    network.registerSensor(s1)
+
+    val readings = Array(
+      Reading(s1.id, 3, 1000),
+      Reading(s1.id, 3, -9999),
+      Reading(s1.id, 3, -10000),
+    )
+    readings.foreach(network.addReading(_))
+    val range = network.minMax("123")
+    assert(range == Some((-10000.0, 1000)))
+  }
+
+  test("minMax returns None for unregistered sensor") {
+    var network = SensorNetworkManager()
+    val range = network.minMax("123")
+    assert(range == None)
+  }
+
+  test("minMax return None for a register with no readings") {
+    var network = SensorNetworkManager()
+    val s1 = Sensor("123", "Dublin", OperatingRange(1, 5))
+    network.registerSensor(s1)
+
+    val range = network.minMax("123")
+    assert(range == None)
+  }
+
+  test("groupedBySensor works") {
+    var network = SensorNetworkManager()
+    val s1 = Sensor("1", "Dublin", OperatingRange(1, 5))
+    val s2 = Sensor("2", "Dublin", OperatingRange(1, 5))
+    val s3 = Sensor("3", "Dublin", OperatingRange(1, 5))
+    network.registerSensor(s1)
+    network.registerSensor(s2)
+    network.registerSensor(s3)
+
+    val readings = Array(
+      Reading(s1.id, 3, 1000),
+      Reading(s1.id, 3, -9999),
+      Reading(s1.id, 3, -10000),
+      Reading(s2.id, 3, 4),
+      Reading(s2.id, 3, 9),
+      Reading(s2.id, 3, -1),
+      Reading(s3.id, 3, 100),
+      Reading(s3.id, 3, 68)
+    )
+    readings.foreach(network.addReading(_))
+
+    val readingMap = network.groupedBySensor()
+    assert(readingMap("1") == Vector(readings(0), readings(1), readings(2)))
+    assert(readingMap("2") == Vector(readings(3), readings(4), readings(5)))
+    assert(readingMap("3") == Vector(readings(6), readings(7)))
+  }
+
+  test("Minute average with readings") {
+    var network = SensorNetworkManager()
+    val s1 = Sensor("1", "Dublin", OperatingRange(1, 5))
+    network.registerSensor(s1)
+    val readings = Array(
+      Reading(s1.id, 3, 10),
+      Reading(s1.id, 3, 20),
+      Reading(s1.id, 59999, -13),
+      Reading(s1.id, 119999, 18),
+      Reading(s1.id, 89424, 5.5),
+      Reading(s1.id, 61000, 10)
+    )
+    readings.foreach(network.addReading(_))
+    val averages = network.minuteAverages("1")
+    println(averages)
+    assert(averages(0) == 5.666666666666667)
+    assert(averages(1) == 11.166666666666666)
   }
 }
